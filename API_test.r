@@ -12,85 +12,35 @@ library('data.table')
 #--------------- Load the following custom functions ---------------#
 # Please do not change the functions contained in functions.r 
 # set your directory the same as functions.r and this script (functions.r must be saved in the same path)
+# Or Set working directory to source file location.
 
 setwd('Your_directory_here')
 #setwd('G:/Shared drives/Development (no client data)/On going projects/API')
-source('functions.r')
+source('functions.r')   #For clustering
+source('API_functions.r') #For API connection and requests
 
 #--------------- Connect with the API ---------------#
 
+CONJOINTLY_TOKEN <- "70|nQZzQDQPwKZFvUfVhixOGrCuVSR1E7ne5zghthAJ" # Paste your token, get a token from https://run.conjoint.ly/utilities/tokens
 
-CONJOINTLY_TOKEN <- "YOUR_TOKEN" # Get a token from https://run.conjoint.ly/utilities/tokens
+experimentList <- listExperiments(20)   # Get a list of your experiments
+experiment_id <- experimentList$id[1]   # Get first experiment id from list
 
-getRespondentsJSON <- function(experiment_id, mode = c('simplified', 'full'), TOKEN = CONJOINTLY_TOKEN) {
-
-  mode <- match.arg(mode)
-
-  headers <- add_headers(
-    `Authorization` = paste("Bearer", TOKEN),
-    `Content-Type` = "application/json",
-    `Accept` = "application/json",
-    `X-Requested-With` = "XMLHttpRequest"
-  )
-
-  # Request export of data as JSON:
-  exportRequest <- POST(
-    paste0("https://api.conjoint.ly/api/report/", experiment_id, "/analysis/respondents/job"),
-    headers,
-    body = toJSON(list(
-      "command" = "respondents",
-      "mode" = mode
-    ), auto_unbox = T)
-  ) |> content("parsed", encoding = "UTF-8")
-
-  # Make sure the export is completed:
-  repeat {
-    if (exportRequest$data$status %in% c('completed', 'done')) {
-      break;
-    }
-    Sys.sleep(2)
-    exportRequest <- GET(
-      paste0("https://api.conjoint.ly/api/jobs/", exportRequest$data$id, "/get"),
-      headers
-    ) |> content("parsed", encoding = "UTF-8")
-  }
-
-  # Find the location of the file on AWS:
-  intermediateFilename <- exportRequest$data$response$result$filename
-  awsFileLocationRequest <- GET(
-    paste0("https://api.conjoint.ly/api/report/", experiment_id, "/respondents?filename=", intermediateFilename),
-    headers
-  ) |> content("text", encoding = "UTF-8")
-
-  # Download the file from AWS:
-  dataRequest <- GET(awsFileLocationRequest) |> 
-    content("text", encoding = "UTF-8") |>
-    fromJSON()
-
-  return(dataRequest)
-}
-
-JSONlist2DataTable <- function(JSONlist) {
-  if (length(JSONlist$output)) {
-    result <- do.call(cbind, JSONlist$output) |> data.table()
-    colnames(result) <- unlist(JSONlist$columns)
-    for (i in colnames(result)) {
-      result[[i]][sapply(result[[i]], is.null)] <- NA
-      result[[i]] <- unlist(result[[i]])
-    }
-  } else {
-    result <- matrix(
-      nrow = 0,
-      ncol = length(result$columns),
-      dimnames = list(NULL, unlist(result$columns))
-    ) |> data.table()
-  }
-  result
-}
-
-experiment_id <- Exp_ID # Include the ID of your experiment here  
+# Or, you can specify an experiment ID here, just un comment the line
+#experiment_id <- Exp_ID
 
 data <- getRespondentsJSON(experiment_id) |> JSONlist2DataTable()
+
+# TODO: Function to list valid variables for clustering - put function in functions.r
+
+listVariables <- function(data){
+  # Takes in data, returns list of variables that can be used in clustering
+  
+}
+
+
+
+
 
 ## ------------------ Clean and select data ----------------
 
