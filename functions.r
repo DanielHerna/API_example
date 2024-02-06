@@ -1,11 +1,27 @@
 ## ------------------ Cluster functions ----------------
 
+#---------- list of available variables to use ---------
+
+listVariables <- function(data){
+  data_num <- as.data.frame(apply(data, 2, as.numeric))
+  data_num <- data_num[,-1]
+  data_num <- data_num[colSums(!is.na(data_num)) > 0]
+  return(colnames(data_num))
+}
+
+#---------- Prepare, the initial data input ----------
+
+preprocessed_data <- function(data){
+
+  data_pro <- data %>% select(all_of(variables_to_include)) %>% lapply(as.numeric) %>%
+  as.data.frame() 
+
+}
+
 #---------- Prepare, code, and clean the data ----------
 
 prepare.data <- function(data){
-  
-  data.fixed <- data%>%select(-participant_id)  
-  
+    
   data.numeric <- select_if(data.fixed,is.numeric)
   data.character <- select_if(data.fixed,is.character)
   data.character.single.fixed <- data.character
@@ -19,76 +35,7 @@ prepare.data <- function(data){
     data.numeric <- data.frame(scale(data.numeric)) 
   }
   
-  # Character data
-  
-  if (ncol(data.character)>0) {
-    
-    # Divide Multi and Single choice
-    
-    data.character.multi <- matrix(NA,nrow = nrow(data.character),ncol = ncol(data.character))
-    data.character.single <- matrix(NA,nrow = nrow(data.character),ncol = ncol(data.character))
-    
-    for (i in 1:ncol(data.character)) {
-      
-      if (length(unlist(strsplit(data.character[,i], ",")))>nrow(data.character)) {
-        
-        data.character.multi[,i]<-data.character[,i]
-      }
-      
-      if (length(unlist(strsplit(data.character[,i], ",")))<=nrow(data.character)) {
-        
-        data.character.single[,i]<-data.character[,i]
-      }
-      
-    }
-    
-    data.character.multi <- as.matrix(data.character.multi[ , colSums(is.na(data.character.multi))==0])
-    data.character.single <- as.matrix(data.character.single[ , colSums(is.na(data.character.single))==0])
-    
-    # code characters into dummies - multi
-    
-    if(ncol(data.character.multi)>0){
-      
-      for (index in 1:ncol(data.character.multi)) {
-        
-        data.fixed.multi <- data.character.multi[,index]
-        All_options <- unique(unlist(strsplit(data.fixed.multi, ",")))
-        aux_set<-data.frame(data.fixed.multi) %>% separate(data.fixed.multi, All_options)
-        
-        row <- nrow(aux_set)
-        column <- length(All_options)
-        
-        coded.data <- matrix(NA,nrow = row,ncol =  column)
-        
-        for (i in 1:row) {
-          
-          for (j in 1:length(All_options)) {
-            
-            coded.data[i,j] <- All_options[j]%in%aux_set[i,]
-            
-          }
-        }
-        
-        coded.data[coded.data==TRUE] <- 1
-        colnames(coded.data) <- paste0('Option: ',All_options,'.',index)
-        coded.data <- coded.data[,-1]
-        
-        data.numeric <- cbind(data.numeric,coded.data) 
-        
-      }
-    }
-    
-    # code characters into dummies - single
-    
-    if(ncol(data.character.single)>0){
-      
-      data.character.single.fixed <- dummy_cols(data.character.single,remove_selected_columns = TRUE,remove_first_dummy = TRUE)
-      
-    }
-
-  }
-  
-  data.fixed <- cbind(data.numeric,data.character.single.fixed)
+  data.fixed <- data.numeric[colSums(!is.na(data.numeric)) > 0]
   return(data.fixed)
 }
 

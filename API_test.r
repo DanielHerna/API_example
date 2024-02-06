@@ -14,7 +14,7 @@ library('data.table')
 # set your directory the same as functions.r and this script (functions.r must be saved in the same path)
 # Or Set working directory to source file location.
 
-setwd('Your_directory_here')
+setwd('G:/Shared drives/Development (no client data)/On going projects/API')
 #setwd('G:/Shared drives/Development (no client data)/On going projects/API')
 source('functions.r')   #For clustering
 source('API_functions.r') #For API connection and requests
@@ -23,43 +23,25 @@ source('API_functions.r') #For API connection and requests
 
 CONJOINTLY_TOKEN <- "70|nQZzQDQPwKZFvUfVhixOGrCuVSR1E7ne5zghthAJ" # Paste your token, get a token from https://run.conjoint.ly/utilities/tokens
 
+
 experimentList <- listExperiments(20)   # Get a list of your experiments
 experiment_id <- experimentList$id[1]   # Get first experiment id from list
 
-# Or, you can specify an experiment ID here, just un comment the line
-#experiment_id <- Exp_ID
-
 data <- getRespondentsJSON(experiment_id) |> JSONlist2DataTable()
-
-# TODO: Function to list valid variables for clustering - put function in functions.r
-
-listVariables <- function(data){
-  # Takes in data, returns list of variables that can be used in clustering
-  
-}
-
-
-
-
+id <- data$participant_id # save respondents ID's
+available_variables <- listVariables(data)
 
 ## ------------------ Clean and select data ----------------
 
-variables_to_include <- c("participant_id",
-  "Q2: _ Survey question",
-  "Q3: _ Selection",
-  "Q4: _ List selection",
-  "Q5: _ List selection",
-  "Q12: PRODUCT LIKERT",
-  "Q14: How likely are you to recommend this company to your friend or colleag"
-) # Specify the column names of the variables you intend to incorporate into the cluster analysis.
+# Specify the column names of the variables you intend to incorporate into the cluster analysis.
 
-data <- data %>% select(all_of(variables_to_include)) %>% lapply(as.numeric) %>%
-  as.data.frame() 
+
+variables_to_include <- c(available_variables) 
+pro_data <- preprocessed_data(data)
 
 ## ------------------ compute clusters ----------------
 
-id <- data$participant_id # save respondents ID's
-data.fixed <- prepare.data(data) # standardize data structure 
+data.fixed <- prepare.data(pro_data) # standardize data structure 
 data.fixed.pca <- pca(data.fixed) # Perform a PCA analysis on the original dataset
 
 #----- k means solution with consensus clustering 

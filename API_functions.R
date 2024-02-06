@@ -26,16 +26,18 @@ listExperiments <- function(count = 20, TOKEN = CONJOINTLY_TOKEN) {
 }
 
 getRespondentsJSON <- function(experiment_id, mode = c('simplified', 'full'), TOKEN = CONJOINTLY_TOKEN) {
-  
+
+  library(httr)
+  library(jsonlite)
   mode <- match.arg(mode)
-  
+
   headers <- add_headers(
     `Authorization` = paste("Bearer", TOKEN),
     `Content-Type` = "application/json",
     `Accept` = "application/json",
     `X-Requested-With` = "XMLHttpRequest"
   )
-  
+
   # Request export of data as JSON:
   exportRequest <- POST(
     paste0("https://api.conjoint.ly/api/report/", experiment_id, "/analysis/respondents/job"),
@@ -45,7 +47,7 @@ getRespondentsJSON <- function(experiment_id, mode = c('simplified', 'full'), TO
       "mode" = mode
     ), auto_unbox = T)
   ) |> content("parsed", encoding = "UTF-8")
-  
+
   # Make sure the export is completed:
   repeat {
     if (exportRequest$data$status %in% c('completed', 'done')) {
@@ -57,23 +59,24 @@ getRespondentsJSON <- function(experiment_id, mode = c('simplified', 'full'), TO
       headers
     ) |> content("parsed", encoding = "UTF-8")
   }
-  
+
   # Find the location of the file on AWS:
   intermediateFilename <- exportRequest$data$response$result$filename
   awsFileLocationRequest <- GET(
     paste0("https://api.conjoint.ly/api/report/", experiment_id, "/respondents?filename=", intermediateFilename),
     headers
   ) |> content("text", encoding = "UTF-8")
-  
+
   # Download the file from AWS:
   dataRequest <- GET(awsFileLocationRequest) |> 
-    content("text", encoding = "UTF-8") |>
-    fromJSON()
-  
+      content("text", encoding = "UTF-8") |>
+      fromJSON()
+
   return(dataRequest)
 }
 
 JSONlist2DataTable <- function(JSONlist) {
+  library(data.table)
   if (length(JSONlist$output)) {
     result <- do.call(cbind, JSONlist$output) |> data.table()
     colnames(result) <- unlist(JSONlist$columns)
