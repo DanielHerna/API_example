@@ -1,7 +1,4 @@
 listExperiments <- function(count = 20, TOKEN = CONJOINTLY_TOKEN) {
-  library(httr)
-  library(jsonlite)
-  library(data.table)
   
   count <- as.integer(count)
   
@@ -25,11 +22,16 @@ listExperiments <- function(count = 20, TOKEN = CONJOINTLY_TOKEN) {
   experiments
 }
 
-getRespondentsJSON <- function(experiment_id, mode = c('simplified', 'full'), TOKEN = CONJOINTLY_TOKEN) {
+formulateElements <- function() {
+  elements <- list(type = "excel", elements = list(
+    list(type = "special-entity", payload = list(what = "respondent-info", mode = "simplified")),  # Replace "simplified" with "full" to get full mode
+    list(type = "special-entity", payload = list(what = "conjoint-data")),  # This only works for conjoint experiments
+    list(type = "special-entity", payload = list(what = "data-dumps"))
+  ))
+  return(elements)
+}
 
-  library(httr)
-  library(jsonlite)
-  mode <- match.arg(mode)
+downloadExport <- function(experiment_id, overwrite = FALSE, filename = "data.xlsx", elements = formulateElements(), TOKEN = CONJOINTLY_TOKEN) {
 
   headers <- add_headers(
     `Authorization` = paste("Bearer", TOKEN),
@@ -38,14 +40,11 @@ getRespondentsJSON <- function(experiment_id, mode = c('simplified', 'full'), TO
     `X-Requested-With` = "XMLHttpRequest"
   )
 
-  # Request export of data as JSON:
+  cat('Requesting export of data...\n')
   exportRequest <- POST(
-    paste0("https://api.conjoint.ly/api/report/", experiment_id, "/analysis/respondents/job"),
+    paste0("https://api.conjoint.ly/api/experiments/", experiment_id, "/export/element"),
     headers,
-    body = toJSON(list(
-      "command" = "respondents",
-      "mode" = mode
-    ), auto_unbox = T)
+    body = toJSON(elements, auto_unbox = T)
   ) |> content("parsed", encoding = "UTF-8")
 
   # Make sure the export is completed:
@@ -54,42 +53,26 @@ getRespondentsJSON <- function(experiment_id, mode = c('simplified', 'full'), TO
       break;
     }
     Sys.sleep(2)
+
+    cat('Checking if file is ready...\n')
     exportRequest <- GET(
       paste0("https://api.conjoint.ly/api/jobs/", exportRequest$data$id, "/get"),
       headers
     ) |> content("parsed", encoding = "UTF-8")
   }
 
-  # Find the location of the file on AWS:
-  intermediateFilename <- exportRequest$data$response$result$filename
+  cat('Finding the location of the file on AWS...\n')
+  intermediateFilename <- exportRequest$data$response$uri
   awsFileLocationRequest <- GET(
-    paste0("https://api.conjoint.ly/api/report/", experiment_id, "/respondents?filename=", intermediateFilename),
+    intermediateFilename,
     headers
-  ) |> content("text", encoding = "UTF-8")
+  )
 
-  # Download the file from AWS:
-  dataRequest <- GET(awsFileLocationRequest) |> 
-      content("text", encoding = "UTF-8") |>
-      fromJSON()
+  cat('Downloading the file from AWS...\n')
+  GET(
+    awsFileLocationRequest$url,
+    write_disk(filename, overwrite = overwrite)
+  )
 
-  return(dataRequest)
-}
-
-JSONlist2DataTable <- function(JSONlist) {
-  library(data.table)
-  if (length(JSONlist$output)) {
-    result <- do.call(cbind, JSONlist$output) |> data.table()
-    colnames(result) <- unlist(JSONlist$columns)
-    for (i in colnames(result)) {
-      result[[i]][sapply(result[[i]], is.null)] <- NA
-      result[[i]] <- unlist(result[[i]])
-    }
-  } else {
-    result <- matrix(
-      nrow = 0,
-      ncol = length(result$columns),
-      dimnames = list(NULL, unlist(result$columns))
-    ) |> data.table()
-  }
-  result
+  return(awsFileLocationRequest$url)
 }

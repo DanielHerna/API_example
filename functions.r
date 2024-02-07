@@ -20,13 +20,8 @@ preprocessed_data <- function(data){
 
 #---------- Prepare, code, and clean the data ----------
 
-prepare.data <- function(data){
+prepare.data <- function(data.numeric){
     
-  data.numeric <- select_if(data.fixed,is.numeric)
-  data.character <- select_if(data.fixed,is.character)
-  data.character.single.fixed <- data.character
-  
-  # Numerical data
   
   if (ncol(data.numeric)>0) {
     

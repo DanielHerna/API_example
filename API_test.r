@@ -8,14 +8,16 @@ library('fastDummies')
 library('httr')
 library('jsonlite')
 library('data.table')
+library('readxl')
+
 
 #--------------- Load the following custom functions ---------------#
 # Please do not change the functions contained in functions.r 
 # set your directory the same as functions.r and this script (functions.r must be saved in the same path)
 # Or Set working directory to source file location.
 
-setwd('G:/Shared drives/Development (no client data)/On going projects/API')
-#setwd('G:/Shared drives/Development (no client data)/On going projects/API')
+setwd('G:/Shared drives/Development (no client data)/On going projects/API') # Change the directory
+
 source('functions.r')   #For clustering
 source('API_functions.r') #For API connection and requests
 
@@ -23,18 +25,27 @@ source('API_functions.r') #For API connection and requests
 
 CONJOINTLY_TOKEN <- "70|nQZzQDQPwKZFvUfVhixOGrCuVSR1E7ne5zghthAJ" # Paste your token, get a token from https://run.conjoint.ly/utilities/tokens
 
+#--------------- Review experiment IDs ---------------#
 
 experimentList <- listExperiments(20)   # Get a list of your experiments
 experiment_id <- experimentList$id[1]   # Get first experiment id from list
 
-data <- getRespondentsJSON(experiment_id) |> JSONlist2DataTable()
+#--------------- Load datasets ---------------#
+
+file_url <- downloadExport(experiment_id, overwrite = TRUE) 
+destination_path <- "data.xlsx"
+download.file(file_url, destination_path, mode = "wb")
+
+respondent_data <- read_excel('data.xlsx',sheet = 'Respondents', skip = 2)
+conjoint_data <- read_excel('data.xlsx',sheet = 'Individual preferences', skip = 2)
+data <- merge(respondent_data,conjoint_data,by='participant_id')
+
 id <- data$participant_id # save respondents ID's
 available_variables <- listVariables(data)
 
 ## ------------------ Clean and select data ----------------
 
 # Specify the column names of the variables you intend to incorporate into the cluster analysis.
-
 
 variables_to_include <- c(available_variables) 
 pro_data <- preprocessed_data(data)
